@@ -27,6 +27,8 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<string>('2026-04-08');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [currentMonth, setCurrentMonth] = useState(new Date(2026, 3, 1)); // April 2026
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://task.moraspirit.com';
 
@@ -48,9 +50,20 @@ export default function Home() {
     const fetchMembers = async () => {
       try {
         setLoading(true);
+        setError(null);
         const response = await fetch(`${API_BASE}/api/members`);
-        if (!response.ok) throw new Error('Failed to fetch members');
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        }
         const data = await response.json();
+
+        if (!data.members || !Array.isArray(data.members)) {
+          throw new Error('Invalid API response: members array not found');
+        }
+
+        if (data.members.length === 0) {
+          throw new Error('No members found in the database');
+        }
 
         const membersWithInitials = data.members.map((m: any) => ({
           ...m,
@@ -66,7 +79,9 @@ export default function Home() {
           setSelectedMemberId(membersWithInitials[0].id);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load members');
+        const errorMsg = err instanceof Error ? err.message : 'Failed to load members';
+        setError(errorMsg);
+        console.error('Members fetch error:', err);
       } finally {
         setLoading(false);
       }
@@ -134,6 +149,9 @@ export default function Home() {
   // Fetch availability for all members on selected date
   useEffect(() => {
     const fetchAllAvailabilities = async () => {
+      setAvailabilityError(null);
+      let hasErrors = false;
+
       for (const member of members) {
         const cacheKey = `${member.id}-${selectedDate}`;
         if (!memberAvailability[cacheKey]) {
@@ -143,17 +161,32 @@ export default function Home() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ msp_id: member.id, date: selectedDate }),
             });
-            if (response.ok) {
-              const data = await response.json();
-              setMemberAvailability((prev) => ({
-                ...prev,
-                [cacheKey]: data,
-              }));
+            if (!response.ok) {
+              console.warn(`Failed to fetch availability for ${member.id}: ${response.status}`);
+              hasErrors = true;
+              continue;
             }
+            const data = await response.json();
+
+            if (!data.id || !data.status) {
+              console.warn(`Invalid availability response for ${member.id}`);
+              hasErrors = true;
+              continue;
+            }
+
+            setMemberAvailability((prev) => ({
+              ...prev,
+              [cacheKey]: data,
+            }));
           } catch (err) {
             console.error(`Failed to fetch availability for ${member.id}:`, err);
+            hasErrors = true;
           }
         }
+      }
+
+      if (hasErrors && members.length > 0) {
+        setAvailabilityError('Some member statuses could not be loaded. Please refresh to retry.');
       }
     };
 
@@ -161,6 +194,39 @@ export default function Home() {
       fetchAllAvailabilities();
     }
   }, [selectedDate, members, memberAvailability, API_BASE]);
+
+  // Retry loading members
+  const retryLoadMembers = async () => {
+    setRetrying(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/members`);
+      if (!response.ok) throw new Error('Failed to fetch members');
+      const data = await response.json();
+
+      if (!data.members || !Array.isArray(data.members)) {
+        throw new Error('Invalid API response');
+      }
+
+      const membersWithInitials = data.members.map((m: any) => ({
+        ...m,
+        initials: m.name
+          .split(' ')
+          .map((n: string) => n[0])
+          .join('')
+          .toUpperCase(),
+      }));
+
+      setMembers(membersWithInitials);
+      setError(null);
+      if (membersWithInitials.length > 0) {
+        setSelectedMemberId(membersWithInitials[0].id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Retry failed');
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <div className="bg-white text-black min-h-screen flex flex-col pb-16 lg:pb-0" style={{ '--mora-red': 'rgba(128, 0, 0, 0.8)' } as React.CSSProperties}>
@@ -355,7 +421,8 @@ export default function Home() {
                       <article
                         key={member.id}
                         onClick={() => setSelectedMemberId(member.id)}
-                        className={`${containerClass} p-4 rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-all bg-white border border-gray-200 ${isSelected ? 'ring-1 ring-red-300' : ''}`}
+                        className={`${containerClass} p-4 rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-all bg-white border border-gray-200 ${isSelected ? 'ring-1 ring-red-300' : ''} relative group`}
+                        title={isBusy && memberData?.reason ? memberData.reason : undefined}
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center text-sm" style={{ backgroundColor: 'rgba(128, 0, 0, 0.8)' }}>
@@ -379,6 +446,13 @@ export default function Home() {
                             <span className="text-xs text-gray-400 italic">Loading...</span>
                           )}
                         </div>
+
+                        {isBusy && memberData?.reason && (
+                          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded p-2 z-50 w-48 max-h-20 overflow-y-auto whitespace-pre-wrap">
+                            <p className="font-bold mb-1 text-red-300">Reason:</p>
+                            <p>{memberData.reason}</p>
+                          </div>
+                        )}
                       </article>
                     );
                   })
@@ -390,11 +464,32 @@ export default function Home() {
               </div>
 
               {error && (
-                <div className="mt-6 bg-red-50 p-3.5 rounded-xl flex items-center gap-3 border border-red-200">
-                  <span className="material-symbols-outlined text-red-600 text-lg">error</span>
-                  <div>
-                    <p className="text-xs font-bold text-red-900">Failed to load members</p>
-                    <p className="text-xs text-red-700">{error}</p>
+                <div className="mt-6 bg-red-50 p-3.5 rounded-xl border border-red-200">
+                  <div className="flex items-start gap-3 mb-2.5">
+                    <span className="material-symbols-outlined text-red-600 text-lg flex-shrink-0">error</span>
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-red-900">Failed to load members</p>
+                      <p className="text-xs text-red-700 mt-0.5">{error}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={retryLoadMembers}
+                    disabled={retrying}
+                    className="text-xs font-bold text-red-700 hover:text-red-900 underline disabled:opacity-50"
+                  >
+                    {retrying ? 'Retrying...' : 'Retry'}
+                  </button>
+                </div>
+              )}
+
+              {availabilityError && !error && (
+                <div className="mt-6 bg-yellow-50 p-3.5 rounded-xl border border-yellow-200">
+                  <div className="flex items-start gap-3">
+                    <span className="material-symbols-outlined text-yellow-600 text-lg flex-shrink-0">warning</span>
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-yellow-900">Warning</p>
+                      <p className="text-xs text-yellow-700 mt-0.5">{availabilityError}</p>
+                    </div>
                   </div>
                 </div>
               )}
