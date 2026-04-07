@@ -118,7 +118,8 @@ export default function Home() {
 
   // Format date for display
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr + 'T00:00:00Z');
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
@@ -314,7 +315,7 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-7 gap-1 text-[10px] text-center font-medium">
                 {getCalendarDays(currentMonth).map((date, idx) => {
-                  const dateStr = date ? date.toISOString().split('T')[0] : null;
+                  const dateStr = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : null;
                   const isSelected = dateStr === selectedDate;
                   const isCurrentMonth = date && date.getMonth() === currentMonth.getMonth();
 
@@ -421,8 +422,7 @@ export default function Home() {
                       <article
                         key={member.id}
                         onClick={() => setSelectedMemberId(member.id)}
-                        className={`${containerClass} p-4 rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-all bg-white border border-gray-200 ${isSelected ? 'ring-1 ring-red-300' : ''} relative group`}
-                        title={isBusy && memberData?.reason ? memberData.reason : undefined}
+                        className={`${containerClass} p-4 rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-all bg-white border border-gray-200 ${isSelected ? 'ring-1 ring-red-300' : ''} relative`}
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div className="w-10 h-10 rounded-full text-white font-bold flex items-center justify-center text-sm" style={{ backgroundColor: 'rgba(128, 0, 0, 0.8)' }}>
@@ -446,13 +446,6 @@ export default function Home() {
                             <span className="text-xs text-gray-400 italic">Loading...</span>
                           )}
                         </div>
-
-                        {isBusy && memberData?.reason && (
-                          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded p-2 z-50 w-48 max-h-20 overflow-y-auto whitespace-pre-wrap">
-                            <p className="font-bold mb-1 text-red-300">Reason:</p>
-                            <p>{memberData.reason}</p>
-                          </div>
-                        )}
                       </article>
                     );
                   })
