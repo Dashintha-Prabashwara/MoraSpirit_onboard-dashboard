@@ -1,30 +1,80 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+interface Member {
+  id: string;
+  name: string;
+  role: string;
+  status?: string;
+  initials: string;
+}
+
+interface AvailabilityResponse {
+  requested_date: string;
+  id: string;
+  name: string;
+  role: string;
+  status: string;
+  reason: string;
+}
+
 export default function Home() {
-  const members = [
-    {
-      id: "MSP001",
-      name: "Arjun Perera",
-      role: "Chief Marketing Officer",
-      status: "Busy",
-      initials: "AP",
-      selected: true,
-    },
-    {
-      id: "MSP024",
-      name: "Sarah De Silva",
-      role: "Lead Developer",
-      status: "Available",
-      initials: "SD",
-      selected: false,
-    },
-    {
-      id: "MSP015",
-      name: "Kasun Jayawardena",
-      role: "Editorial Lead",
-      status: "Available",
-      initials: "KJ",
-      selected: false,
-    },
-  ];
+  const [members, setMembers] = useState<Member[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [selectedMemberData, setSelectedMemberData] = useState<AvailabilityResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>('2026-04-08');
+
+  const API_BASE = 'https://task.moraspirit.com';
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_BASE}/api/members`);
+        if (!response.ok) throw new Error('Failed to fetch members');
+        const data = await response.json();
+
+        const membersWithInitials = data.members.map((m: any) => ({
+          ...m,
+          initials: m.name.split(' ').map((n: string) => n[0]).join('').toUpperCase(),
+        }));
+
+        setMembers(membersWithInitials);
+        if (membersWithInitials.length > 0) {
+          setSelectedMemberId(membersWithInitials[0].id);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load members');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMembers();
+  }, []);
+
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      if (!selectedMemberId) return;
+      try {
+        const response = await fetch(`${API_BASE}/api/availability/check`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ msp_id: selectedMemberId, date: selectedDate }),
+        });
+        if (!response.ok) throw new Error('Failed to fetch availability');
+        const data = await response.json();
+        setSelectedMemberData(data);
+      } catch (err) {
+        console.error('Availability fetch error:', err);
+      }
+    };
+
+    fetchAvailability();
+  }, [selectedMemberId, selectedDate]);
 
   return (
     <div className="bg-background text-(--on-background) min-h-screen flex flex-col pb-20 lg:pb-0">
@@ -146,57 +196,69 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {members.map((member) => {
-                  const isBusy = member.status === "Busy";
-                  const statusColor = isBusy ? "bg-red-600" : "bg-emerald-500";
-                  const statusText = isBusy ? "text-red-600" : "text-emerald-600";
-                  const containerClass = member.selected
-                    ? "bg-[var(--surface-container-lowest)] ring-2 ring-teal-700/30 border-l-4 border-teal-500"
-                    : "bg-[var(--surface-container-lowest)]";
-
-                  return (
-                    <article key={member.id} className={`${containerClass} p-5 rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-all`}>
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="w-12 h-12 rounded-full academic-gradient text-white font-bold flex items-center justify-center">
-                          {member.initials}
+                {loading ? (
+                  <>
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="bg-[var(--surface-container-low)] p-5 rounded-xl animate-pulse">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="w-12 h-12 rounded-full bg-[var(--surface-container-highest)]"></div>
+                          <div className="w-16 h-4 rounded bg-[var(--surface-container-highest)]"></div>
                         </div>
-                        <span className="bg-[var(--secondary-container)] text-[var(--on-surface-variant)] text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
-                          {member.id}
-                        </span>
+                        <div className="w-32 h-4 rounded bg-[var(--surface-container-highest)] mb-2"></div>
+                        <div className="w-20 h-3 rounded bg-[var(--surface-container-highest)] mb-4"></div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-[var(--surface-container-highest)]"></div>
+                          <div className="w-16 h-2 rounded bg-[var(--surface-container-highest)]"></div>
+                        </div>
                       </div>
-                      <h4 className="font-bold text-xl leading-tight">{member.name}</h4>
-                      <p className="text-sm text-slate-500 font-medium mb-3">{member.role}</p>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${statusColor}`}></span>
-                        <span className={`text-xs font-bold uppercase tracking-wider ${statusText}`}>{member.status}</span>
-                      </div>
-                    </article>
-                  );
-                })}
+                    ))}
+                  </>
+                ) : members.length > 0 ? (
+                  members.map((member) => {
+                    const isSelected = member.id === selectedMemberId;
+                    const containerClass = isSelected
+                      ? "bg-[var(--surface-container-lowest)] ring-2 ring-teal-700/30 border-l-4 border-teal-500"
+                      : "bg-[var(--surface-container-lowest)]";
 
-                {[1, 2, 3].map((item) => (
-                  <div key={item} className="bg-[var(--surface-container-low)] p-5 rounded-xl animate-pulse">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 rounded-full bg-[var(--surface-container-highest)]"></div>
-                      <div className="w-16 h-4 rounded bg-[var(--surface-container-highest)]"></div>
-                    </div>
-                    <div className="w-32 h-4 rounded bg-[var(--surface-container-highest)] mb-2"></div>
-                    <div className="w-20 h-3 rounded bg-[var(--surface-container-highest)] mb-4"></div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-[var(--surface-container-highest)]"></div>
-                      <div className="w-16 h-2 rounded bg-[var(--surface-container-highest)]"></div>
-                    </div>
+                    return (
+                      <article
+                        key={member.id}
+                        onClick={() => setSelectedMemberId(member.id)}
+                        className={`${containerClass} p-5 rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-all`}
+                      >
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="w-12 h-12 rounded-full academic-gradient text-white font-bold flex items-center justify-center">
+                            {member.initials}
+                          </div>
+                          <span className="bg-[var(--secondary-container)] text-[var(--on-surface-variant)] text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+                            {member.id}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-xl leading-tight">{member.name}</h4>
+                        <p className="text-sm text-slate-500 font-medium mb-3">{member.role}</p>
+                        {selectedMemberData?.id === member.id && (
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${selectedMemberData?.status === 'busy' ? 'bg-red-600' : 'bg-emerald-500'}`}></span>
+                            <span className={`text-xs font-bold uppercase tracking-wider ${selectedMemberData?.status === 'busy' ? 'text-red-600' : 'text-emerald-600'}`}>
+                              {selectedMemberData?.status === 'busy' ? 'Busy' : 'Available'}
+                            </span>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })
+                ) : null}
+              </div>
+
+              {error && (
+                <div className="mt-8 bg-[var(--error-container)]/30 p-4 rounded-xl flex items-center gap-4">
+                  <span className="material-symbols-outlined text-[var(--error)]">error</span>
+                  <div>
+                    <p className="text-sm font-bold text-red-900">Failed to load members</p>
+                    <p className="text-xs text-red-900/70">{error}</p>
                   </div>
-                ))}
-              </div>
-
-              <div className="mt-8 bg-[var(--error-container)]/30 p-4 rounded-xl flex items-center gap-4">
-                <span className="material-symbols-outlined text-[var(--error)]">error</span>
-                <div>
-                  <p className="text-sm font-bold text-red-900">Filter synchronization failed</p>
-                  <p className="text-xs text-red-900/70">Unable to load the "Editorial" department members. Please refresh or try again later.</p>
                 </div>
-              </div>
+              )}
             </section>
 
             <section className="xl:col-span-4">
