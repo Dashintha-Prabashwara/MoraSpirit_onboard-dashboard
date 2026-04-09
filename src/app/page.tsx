@@ -318,6 +318,9 @@ export default function Home() {
                   const dateStr = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` : null;
                   const isSelected = dateStr === selectedDate;
                   const isCurrentMonth = date && date.getMonth() === currentMonth.getMonth();
+                  const today = new Date();
+                  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                  const isToday = dateStr === todayStr;
 
                   return (
                     <button
@@ -331,6 +334,8 @@ export default function Home() {
                           ? 'text-white rounded-md font-bold'
                           : !isCurrentMonth
                           ? 'text-gray-300'
+                          : isToday
+                          ? 'hover:bg-gray-100 cursor-pointer border border-gray-400'
                           : 'hover:bg-gray-100 cursor-pointer'
                       }`}
                       style={
