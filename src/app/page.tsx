@@ -18,29 +18,46 @@ interface AvailabilityResponse {
   reason: string;
 }
 
+const getTodayString = () => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+};
+
 export default function Home() {
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [memberAvailability, setMemberAvailability] = useState<Record<string, AvailabilityResponse>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('2026-04-08');
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 3, 1)); // April 2026
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'busy'>('all');
+  const [currentMonth, setCurrentMonth] = useState(new Date()); // Current month
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://task.moraspirit.com';
 
-  // Filter members based on search
+  // Filter members based on search and status
   const filteredMembers = useMemo(() => {
-    return members.filter(
-      (m) =>
+    return members.filter((m) => {
+      const matchesSearch =
         m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         m.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.id.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [members, searchQuery]);
+        m.id.toLowerCase().includes(searchQuery.toLowerCase());
+
+      if (!matchesSearch) return false;
+
+      if (statusFilter === 'all') return true;
+
+      const memberData = memberAvailability[`${m.id}-${selectedDate}`];
+      if (!memberData) return true; // Show if data not loaded yet
+
+      return statusFilter === 'available'
+        ? memberData.status === 'available'
+        : memberData.status === 'busy';
+    });
+  }, [members, searchQuery, statusFilter, memberAvailability, selectedDate]);
 
   // Get selected member info
   const selectedMember = members.find((m) => m.id === selectedMemberId);
@@ -119,13 +136,16 @@ export default function Home() {
   // Format date for display
   const formatDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+
+    // Tomohiko Sakamoto's algorithm - calculates day of week without timezone issues
+    const t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+    const y = month < 3 ? year - 1 : year;
+    const dayOfWeek = (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + t[month - 1] + day) % 7;
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    return `${dayNames[dayOfWeek]}, ${monthNames[month - 1]} ${day}, ${year}`;
   };
 
   // Get calendar days for month
@@ -135,7 +155,11 @@ export default function Home() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
+    // Adjust for calendar headers starting with Monday (not Sunday)
+    // getDay(): 0=Sun, 1=Mon, ..., 6=Sat
+    // Calendar headers: M T W T F S S (col 0=Mon, col 6=Sun)
+    const dayOfWeek = firstDay.getDay();
+    const startingDayOfWeek = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
     const days = [];
     for (let i = 0; i < startingDayOfWeek; i++) {
@@ -396,6 +420,25 @@ export default function Home() {
                 </div>
               </div>
 
+              <div className="flex gap-2 mb-5">
+                {(['all', 'available', 'busy'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setStatusFilter(filter)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                      statusFilter === filter
+                        ? 'text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                    style={
+                      statusFilter === filter ? { backgroundColor: 'rgba(128, 0, 0, 0.8)' } : {}
+                    }
+                  >
+                    {filter === 'all' ? 'All' : filter === 'available' ? '✓ Available' : '◆ Busy'}
+                  </button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {loading ? (
                   <>
@@ -570,10 +613,12 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <button className="w-full mt-6 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border-2 font-bold hover:bg-red-50 transition-colors text-sm" style={{ borderColor: 'rgba(128, 0, 0, 0.8)', color: 'rgba(128, 0, 0, 0.8)' }}>
-                        <span>Schedule Meeting</span>
-                        <span className="material-symbols-outlined text-xs">arrow_forward</span>
-                      </button>
+                      {selectedMemberData.status !== 'busy' && (
+                        <button className="w-full mt-6 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border-2 font-bold hover:bg-red-50 transition-colors text-sm" style={{ borderColor: 'rgba(128, 0, 0, 0.8)', color: 'rgba(128, 0, 0, 0.8)' }}>
+                          <span>Schedule Meeting</span>
+                          <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                        </button>
+                      )}
                     </div>
                   </article>
                 ) : loading ? (
