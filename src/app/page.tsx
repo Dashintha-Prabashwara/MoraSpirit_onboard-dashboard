@@ -402,6 +402,18 @@ export default function Home() {
             <p className="text-gray-500 max-w-2xl text-base">
               Real-time status tracking for the MoraSpirit core team. Select a member to view detailed commitments and schedules.
             </p>
+
+            {/* Mobile Date Selection */}
+            <div className="lg:hidden mt-4">
+              <label className="block text-xs uppercase tracking-widest text-gray-500 font-bold mb-2">Select Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
+                style={{ focusRingColor: 'rgba(128, 0, 0, 0.8)' }}
+              />
+            </div>
           </header>
 
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
