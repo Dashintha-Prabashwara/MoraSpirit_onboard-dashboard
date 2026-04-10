@@ -547,7 +547,7 @@ export default function Home() {
               )}
             </section>
 
-            <section className="xl:col-span-4">
+            <section className="hidden xl:block xl:col-span-4">
               <div className="sticky top-20">
                 <h3 className="text-2.5xl font-bold font-headline mb-5">Status Insight</h3>
 
@@ -661,6 +661,106 @@ export default function Home() {
           </div>
         </main>
       </div>
+
+      {/* Mobile Modal for Status Insight */}
+      {selectedMember && selectedMemberData && (
+        <div className="xl:hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end">
+          <div className="w-full bg-white rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-5 duration-300 max-h-[90vh] overflow-y-auto pb-20">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-3xl">
+              <h3 className="text-2xl font-bold font-headline">Status Insight</h3>
+              <button
+                onClick={() => setSelectedMemberId(null)}
+                className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <span className="material-symbols-outlined text-gray-600">close</span>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <article className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
+                <div className="p-6 text-white relative" style={{ backgroundColor: 'rgba(128, 0, 0, 0.8)' }}>
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="bg-white/20 backdrop-blur-md px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest">
+                        Selected Member
+                      </span>
+                    </div>
+                    <h4 className="text-3xl font-extrabold font-headline">{selectedMember.name}</h4>
+                    <p className="text-white/80 text-xs font-medium">
+                      {selectedMember.role} • {selectedMember.id}
+                    </p>
+                  </div>
+                  <div className="absolute -right-3 -bottom-3 opacity-10">
+                    <span className="material-symbols-outlined text-[100px]">account_circle</span>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <p className="text-[8px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">
+                        Status on {formatDate(selectedDate).split(',')[0]}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full ${
+                            selectedMemberData.status === 'busy' ? 'bg-red-600' : 'bg-green-500'
+                          }`}
+                        ></span>
+                        <span className="text-2.5xl font-extrabold capitalize">
+                          {selectedMemberData.status === 'busy' ? 'Busy' : 'Available'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[8px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">Date</p>
+                      <p className="text-xs font-bold text-gray-700">{formatDate(selectedDate).split(',')[1].trim()}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-5">
+                    {selectedMemberData.status === 'busy' && (
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <div className="flex items-center gap-1.5 mb-2.5">
+                          <span className="material-symbols-outlined text-red-600 text-xs">event_busy</span>
+                          <p className="text-xs font-bold uppercase tracking-wider text-red-600">Reason for Absence</p>
+                        </div>
+                        <p className="text-xs text-gray-700 leading-relaxed italic">
+                          "{selectedMemberData.reason}"
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                        <p className="text-[8px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">
+                          Department
+                        </p>
+                        <p className="text-xs font-bold text-gray-900">
+                          {selectedMember.role.split(' ').slice(-1)[0]}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                        <p className="text-[8px] uppercase tracking-widest text-gray-500 font-bold mb-0.5">
+                          Member ID
+                        </p>
+                        <p className="text-xs font-bold text-gray-900">{selectedMember.id}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedMemberData.status !== 'busy' && (
+                    <button className="w-full mt-6 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border-2 font-bold hover:bg-red-50 transition-colors text-sm" style={{ borderColor: 'rgba(128, 0, 0, 0.8)', color: 'rgba(128, 0, 0, 0.8)' }}>
+                      <span>Schedule Meeting</span>
+                      <span className="material-symbols-outlined text-xs">arrow_forward</span>
+                    </button>
+                  )}
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="lg:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-3 pb-3 pt-1.5 bg-white/90 backdrop-blur-md rounded-t-xl border-t border-gray-200">
         <div className="flex flex-col items-center text-gray-500 px-2.5 py-0.5 text-xs">
