@@ -18,6 +18,7 @@ interface AvailabilityResponse {
   reason: string;
 }
 
+// Returns today's date as a string in YYYY-MM-DD format
 const getTodayString = () => {
   const today = new Date();
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -38,7 +39,7 @@ export default function Home() {
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://task.moraspirit.com';
 
-  // Filter members based on search and status
+  // Filters members by search query and status; recalculates when dependencies change
   const filteredMembers = useMemo(() => {
     return members.filter((m) => {
       const matchesSearch =
@@ -63,6 +64,7 @@ export default function Home() {
   const selectedMember = members.find((m) => m.id === selectedMemberId);
   const selectedMemberData = selectedMemberId ? memberAvailability[`${selectedMemberId}-${selectedDate}`] : null;
 
+  // Fetches initial member list on component mount
   useEffect(() => {
     const fetchMembers = async () => {
       try {
@@ -107,6 +109,7 @@ export default function Home() {
     fetchMembers();
   }, []);
 
+  // Fetches selected member's availability for the chosen date (uses cache to avoid duplicate requests)
   useEffect(() => {
     const fetchAvailability = async () => {
       if (!selectedMemberId) return;
@@ -133,7 +136,8 @@ export default function Home() {
     fetchAvailability();
   }, [selectedMemberId, selectedDate, memberAvailability, API_BASE]);
 
-  // Format date for display
+  // Converts YYYY-MM-DD to human-readable format (e.g., "Monday, April 10, 2026")
+  // Uses Sakamoto's algorithm to avoid timezone conversion issues
   const formatDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number);
 
@@ -148,7 +152,8 @@ export default function Home() {
     return `${dayNames[dayOfWeek]}, ${monthNames[month - 1]} ${day}, ${year}`;
   };
 
-  // Get calendar days for month
+  // Generates calendar grid array for a month, with null padding for empty cells
+  // Calendar starts Monday (index 0) and ends Sunday (index 6)
   const getCalendarDays = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
@@ -171,7 +176,7 @@ export default function Home() {
     return days;
   };
 
-  // Fetch availability for all members on selected date
+  // Fetches availability for all members when date changes; tracks errors gracefully
   useEffect(() => {
     const fetchAllAvailabilities = async () => {
       setAvailabilityError(null);
@@ -220,7 +225,7 @@ export default function Home() {
     }
   }, [selectedDate, members, memberAvailability, API_BASE]);
 
-  // Retry loading members
+  // Attempts to reload members from API, used when initial load fails
   const retryLoadMembers = async () => {
     setRetrying(true);
     try {
