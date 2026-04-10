@@ -411,7 +411,6 @@ export default function Home() {
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
-                style={{ focusRingColor: 'rgba(128, 0, 0, 0.8)' }}
               />
             </div>
           </header>
